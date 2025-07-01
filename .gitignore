@@ -1,0 +1,5 @@
+*.o
+*.prg
+*.d64
+build/
+chat
