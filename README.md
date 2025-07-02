@@ -1,23 +1,23 @@
 # C64 LLM Chat Console
 
-A Commodore 64 application written in C that enables real-time chat communication with Large Language Models (LLMs) over hardware serial connection.
+A Commodore 64 application written that enables real-time chat communication with Large Language Models (LLMs) over hardware serial connection.
 
 ## Overview
 
-This application transforms your C64 into a terminal for chatting with modern AI assistants. It uses the built-in serial port to communicate at 2400 bps with a host computer running an LLM interface.
+This application transforms your C64 into a terminal for chatting with modern AI assistants. It uses the built-in serial port to communicate at 1200 bps with a host computer running an LLM interface.
 
 ## Features
 
-- **Serial Communication**: 2400 bps serial connection via C64's built-in UART
+- **Serial Communication**: 1200 bps serial connection via C64's built-in UART
 - **Real-time Display**: Shows LLM responses character-by-character as they arrive
 - **BASIC-style Input**: Inline editing with blinking cursor, just like C64 BASIC
 - **Protocol Handshake**: Sends identification string on startup
-- **Flow Control**: Handles EOF and message boundaries properly
+- **Flow Control**: Handles end-of-transmission and message boundaries properly
 - **Seamless Chat**: No prefixes or labels - pure conversational flow
 
 ## Hardware Requirements
 
-- Commodore 64 with working serial port
+- Commodore 64 with working serial port (or emulate it)
 - Serial cable (DB-25 or appropriate adapter)
 - Host computer with serial port or USB-to-serial adapter
 - Null modem cable if connecting directly between computers
@@ -37,7 +37,7 @@ This application transforms your C64 into a terminal for chatting with modern AI
 
 ## Serial Configuration
 
-- **Baud Rate**: 2400 bps
+- **Baud Rate**: 1200 bps
 - **Data Bits**: 8
 - **Parity**: None
 - **Stop Bits**: 1
@@ -45,46 +45,34 @@ This application transforms your C64 into a terminal for chatting with modern AI
 
 ## Building
 
-Requires CC65 compiler suite:
-
-```bash
-make
-```
-
-Or manually:
-```bash
-cl65 -t c64 -o chat.prg main.c serial.c display.c input.c
-```
+This version uses C64 BASIC - no compilation needed!
 
 ### Creating a Disk Image
 
-To create a .d64 disk image for use with VICE or real hardware:
+To create a .d64 disk image with the BASIC program:
 
 ```bash
-make disk
+c1541 -format "chat disk",cd d64 chat.d64 -attach chat.d64 -write chat.bas chat
 ```
-
-This creates `chat.d64` with the program file ready to load.
 
 ## Usage
 
-1. Load the program: `LOAD "CHAT.PRG",8,1`
-2. Connect serial cable to host computer
+1. Load the program: `LOAD "CHAT",8`
+2. Connect serial cable to host computer  
 3. Run: `RUN`
-4. Wait for "CONNECTED" message
+4. Wait for "CONNECTED" message (dots appear while connecting)
 5. LLM responses appear directly on screen
-6. After LLM finishes (extra newline + blinking cursor), type and edit your message
-7. Press RETURN to send and continue the conversation
+6. After LLM finishes (EOF), type your message and press RETURN
+7. Continue the conversation
 
-The experience feels like having a conversation directly in BASIC, with the AI's words appearing naturally followed by your familiar blinking cursor prompt.
+The experience feels like having a conversation directly in BASIC, with the AI's words appearing naturally followed by your familiar BASIC prompt.
 
 ## File Structure
 
-- `main.c` - Main program loop and initialization
-- `serial.c` - Serial communication routines
-- `display.c` - Screen output and cursor management
-- `input.c` - BASIC-style line input with editing
-- `protocol.h` - Communication protocol definitions
+- `chat.bas` - BASIC program for C64 LLM communication
+- `c64_llm_bridge.py` - Python bridge script for LLM communication  
+- `LINUX_SETUP.md` - Linux host setup instructions
+- `instructions_socat.md` - Virtual serial port setup
 
 ## Host Computer Setup
 

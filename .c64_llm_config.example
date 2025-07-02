@@ -1,0 +1,9 @@
+# C64 LLM Bridge Configuration
+# Copy this file to .c64_llm_config and add your actual API key
+
+# OpenAI API Key
+OPENAI_API_KEY=your-openai-api-key-here
+
+# Optional: Other LLM service configurations
+# ANTHROPIC_API_KEY=your-anthropic-key-here
+# OLLAMA_URL=http://localhost:11434

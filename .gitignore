@@ -1,5 +1,4 @@
-*.o
-*.prg
 *.d64
-build/
-chat
+.c64_llm_config
+.env
+venv/

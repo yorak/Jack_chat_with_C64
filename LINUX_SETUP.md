@@ -1,11 +1,10 @@
 # Linux Host Setup Guide
 
-This guide covers setting up your Linux machine to communicate with the C64 LLM chat application.
+This guide covers setting up your Linux machine to communicate with the emulated C64 LLM chat application.
 
 ## Prerequisites
 
 - Ubuntu/Debian-based Linux distribution
-- Serial port or USB-to-serial adapter
 - Python 3.x installed
 
 ## Install Development Tools
@@ -22,7 +21,7 @@ Verify installation:
 cl65 --version
 ```
 
-### Install VICE C64 Emulator (Optional)
+### Install VICE C64 Emulator
 
 For testing without real hardware:
 
@@ -30,7 +29,7 @@ For testing without real hardware:
 sudo apt install vice
 ```
 
-**Note:** Ubuntu's VICE package doesn't include the required ROM files (kernal, basic, drive, etc.). You'll need to obtain these separately and configure VICE to use them.
+**Note:** Ubuntu's VICE package doesn't include the required ROM files (kernal, basic, drive, etc.). You'll need to obtain these separately and configure VICE to use them and/or set symbolic links with names VICE expects.
 
 ## Virtual Serial Port Setup
 
@@ -46,7 +45,7 @@ sudo apt install socat
 
 Run this command to create two connected virtual serial ports:
 ```bash
-socat -d -d pty,raw,echo=0 pty,raw,echo=0
+socat -d -d pty,raw,echo=0,clocal=1 pty,raw,echo=0,clocal=1
 ```
 
 This will output something like:
@@ -57,7 +56,7 @@ This will output something like:
 
 Note the two device paths - you'll use these for connecting VICE and the Python bridge.
 
-### Test Virtual Ports
+### Test Virtual Ports (Optional)
 
 Open two terminals and test the connection:
 - Terminal 1: `screen /dev/pts/3 2400`
@@ -74,17 +73,88 @@ If using actual C64 hardware, you'll need:
 
 ## Python LLM Bridge Script
 
-Install required Python packages:
+### Create Virtual Environment (Recommended)
+
+Create and activate a Python virtual environment:
 ```bash
-pip install pyserial openai  # or your preferred LLM library
+python3 -m venv venv
+source venv/bin/activate
 ```
 
-The Python bridge script (`c64_llm_bridge.py`) handles communication between the C64 and your LLM service. See the included script file for the complete implementation.
+Install required Python packages:
+```bash
+pip install -r requirements.txt
+```
+
+The Python bridge script (`c64_llm_bridge.py`) handles communication between the C64 and your LLM service.
+
+### Configure API Key
+
+Copy the example environment file and add your API key:
+```bash
+cp .env.example .env
+# Edit .env and add your OpenAI API key
+```
 
 ### Make Script Executable
 
 ```bash
 chmod +x c64_llm_bridge.py
+```
+
+### Usage
+
+#### Basic Usage
+
+Run with default settings:
+```bash
+./c64_llm_bridge.py
+```
+
+Specify serial port:
+```bash
+./c64_llm_bridge.py /dev/pts/4
+# or
+./c64_llm_bridge.py --port /dev/pts/4
+```
+
+#### Advanced Options
+
+Custom system prompt:
+```bash
+./c64_llm_bridge.py --system-prompt system_prompt.txt
+```
+
+Custom baud rate and timeout:
+```bash
+./c64_llm_bridge.py --baud 2400 --timeout 5
+```
+
+Disable automatic greeting:
+```bash
+./c64_llm_bridge.py --no-auto-message
+```
+
+Combined options:
+```bash
+./c64_llm_bridge.py /dev/pts/4 -s system_prompt.txt -b 1200 -t 3
+```
+
+#### Available Command Line Options
+
+- **Serial port**: Positional argument or `-p/--port`
+- **`-s/--system-prompt`**: Path to custom system prompt file
+- **`-b/--baud`**: Baud rate (default: 1200)
+- **`-t/--timeout`**: Idle timeout in seconds (default: 3)
+- **`--no-auto-message`**: Disable automatic greeting after timeout
+- **`--debug`**: Enable verbose debug output
+- **`-h/--help`**: Show detailed help with examples
+
+#### Get Help
+
+View all available options:
+```bash
+./c64_llm_bridge.py --help
 ```
 
 ## Building the C64 Application
@@ -113,47 +183,34 @@ cl65 -t c64 -o chat.prg main.c serial.c display.c input.c
    ```
    Note the two device paths (e.g., `/dev/pts/3` and `/dev/pts/4`)
 
-2. Start VICE with autostart:
+2. Start VICE with serial configuration:
    ```bash
-   x64sc -autostartprgmode 1 chat.prg
+   x64sc -rsuser1 /dev/pts/3 -rsuserbaud 1200 chat.bas
+   ```
+   
+   Or manually:
+   ```bash
+   x64sc
+   ```
+   Then configure serial emulation in VICE:
+   - Go to Settings → I/O Settings → RS232
+   - Enable RS232 emulation  
+   - Set device to one of the virtual ports (e.g., `/dev/pts/3`)
+   - Set baud rate to 1200
+   - Paste the .bas code to emulated C64 Basic prompt
+   - Write `RUN` to code to emulated C64 Basic prompt
+
+3. Run the Python bridge script with the other virtual port:
+   ```bash
+   ./c64_llm_bridge.py /dev/pts/4
+   ```
+   
+   Or with custom options:
+   ```bash
+   ./c64_llm_bridge.py /dev/pts/4 --system-prompt c64_prompt.txt --timeout 5
    ```
 
-3. Configure serial emulation in VICE:
-   - Go to Settings → I/O Settings → RS232
-   - Enable RS232 emulation
-   - Set device to one of the virtual ports (e.g., `/dev/pts/3`)
-   - Set baud rate to 2400
-
-4. Update the Python bridge script to use the other virtual port (e.g., `/dev/pts/4`)
-
-5. Run the Python bridge script
-6. Test the connection
-
-## Troubleshooting
-
-### Serial Port Issues
-
-Check port permissions:
-```bash
-ls -l /dev/ttyUSB0
-```
-
-Should show your user in the dialout group.
-
-### Connection Problems
-
-Monitor serial traffic:
-```bash
-sudo apt install interceptty
-interceptty /dev/ttyUSB0 /tmp/intercept
-```
-
-### Python Dependencies
-
-If you get import errors:
-```bash
-pip install --user pyserial openai
-```
+4. Test the connection
 
 ## Alternative LLM Services
 
