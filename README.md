@@ -2,6 +2,15 @@
 
 A Commodore 64 application written that enables real-time chat communication with Large Language Models (LLMs) over hardware serial connection.
 
+## Demo
+
+<video width="640" height="480" controls>
+  <source src="docs/jack.mp4" type="video/mp4">
+  Your browser does not support the video tag.
+</video>
+
+*Example session showing real-time LLM chat on an emulated C64*
+
 ## Overview
 
 This application transforms your C64 into a terminal for chatting with modern AI assistants. It uses the built-in serial port to communicate at 1200 bps with a host computer running an LLM interface.
@@ -92,8 +101,10 @@ The experience feels like having a conversation directly in BASIC, with the AI's
 
 ## Host Computer Setup
 
+For detailed Linux setup instructions, see: **[LINUX_SETUP.md](LINUX_SETUP.md)**
+
 The host computer needs:
-- Serial port configured for 2400 bps, 8N1
+- Serial port configured for 1200 bps, 8N1
 - LLM interface software (Python script, etc.)
 - Proper handling of the C64's identification string
 
