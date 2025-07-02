@@ -4,10 +4,7 @@ A Commodore 64 application written that enables real-time chat communication wit
 
 ## Demo
 
-<video width="640" height="480" controls>
-  <source src="docs/jack.mp4" type="video/mp4">
-  Your browser does not support the video tag.
-</video>
+![C64 LLM Chat Demo](docs/jack.gif)
 
 *Example session showing real-time LLM chat on an emulated C64*
 
