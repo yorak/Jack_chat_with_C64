@@ -103,14 +103,22 @@ def load_system_prompt(system_prompt_file=None):
     if not system_prompt_file:
         system_prompt_file = os.getenv('SYSTEM_PROMPT_FILE')
     
-    if system_prompt_file and os.path.exists(system_prompt_file):
+    if system_prompt_file:
+        if not os.path.exists(system_prompt_file):
+            print(f"Error: System prompt file '{system_prompt_file}' not found.")
+            sys.exit(1)
+        
         try:
             with open(system_prompt_file, 'r') as f:
                 prompt = f.read().strip()
+                if not prompt:
+                    print(f"Error: System prompt file '{system_prompt_file}' is empty.")
+                    sys.exit(1)
                 debug_system(f"Loaded system prompt from {system_prompt_file}")
                 return prompt
         except Exception as e:
-            debug_system(f"Error loading system prompt: {e}")
+            print(f"Error reading system prompt file '{system_prompt_file}': {e}")
+            sys.exit(1)
     
     # Default system prompt
     return "You are a helpful assistant. Keep responses concise and under 200 characters when possible."
@@ -160,6 +168,11 @@ def main():
         ser.reset_output_buffer()
         debug_system(f"Listening on {args.port} at {args.baud} bps...")
         
+        # Chat history and system prompt
+        system_prompt = load_system_prompt(args.system_prompt_file)
+        chat_history = [{"role": "system", "content": system_prompt}]
+        debug_system(f"System prompt: {system_prompt[:100]}{'...' if len(system_prompt) > 100 else ''}")
+        
         # Main loop (waiting for handshake, then handling chat messages)
         debug_system("Waiting for C64 to connect...")
         chat_buffer = ""
@@ -168,10 +181,7 @@ def main():
         auto_message_inserted = False
         handshake_completed = False  # Track if handshake was already processed
         
-        # Chat history and system prompt
-        system_prompt = load_system_prompt(args.system_prompt_file)
-        chat_history = [{"role": "system", "content": system_prompt}]
-        debug_system(f"System prompt: {system_prompt[:100]}{'...' if len(system_prompt) > 100 else ''}")
+
         
         while True:
             try:
@@ -221,19 +231,17 @@ def main():
                             # Add user message to chat history
                             chat_history.append({"role": "user", "content": message})
                             
-                            # Get LLM response with history
-                            debug_system("Getting LLM response...")
+                            # Get streaming LLM response with history
+                            debug_system("Getting streaming LLM response...")
                             debug_llm_request(message)
-                            response = get_llm_response_with_history(chat_history)
+                            response = stream_llm_response_with_history(chat_history, ser)
                             debug_llm_response(response)
                             
                             # Add assistant response to chat history
                             chat_history.append({"role": "assistant", "content": response})
                             
-                            # Send response to C64 with EOF marker
-                            response_bytes = response.encode('ascii', errors='ignore')
-                            debug_serial_out(response_bytes + EOM_C64)
-                            ser.write(response_bytes)
+                            # Send EOF marker after streaming is complete
+                            debug_serial_out(EOM_C64)
                             ser.write(EOM_C64)  # EOF character
                             ser.flush()
                         else:
@@ -275,38 +283,75 @@ def main():
             ser.close()
             debug_system("Serial port closed.")
 
-def get_llm_response_with_history(chat_history):
+def stream_llm_response_with_history(chat_history, serial_port):
     """
-    Get response from LLM service with full chat history.
+    Stream response from LLM service with full chat history, sending words as they arrive.
     """
     try:
-        # OpenAI ChatGPT example with history
-        response = openai.ChatCompletion.create(
+        # OpenAI ChatGPT streaming example with history
+        response_stream = openai.ChatCompletion.create(
             model="gpt-3.5-turbo",
             messages=chat_history,
             max_tokens=200,
-            temperature=0.7
+            temperature=0.7,
+            stream=True
         )
-        return response.choices[0].message.content.strip().upper()
+        
+        full_response = ""
+        current_word = ""
+        
+        for chunk in response_stream:
+            if chunk.choices[0].delta.get('content'):
+                content = chunk.choices[0].delta.content
+                full_response += content
+                
+                # Process character by character
+                for char in content:
+                    if char.isspace():  # Space, newline, tab, etc.
+                        if current_word:
+                            # Send the complete word
+                            word_bytes = current_word.upper().encode('ascii', errors='ignore')
+                            debug_serial_out(word_bytes)
+                            serial_port.write(word_bytes)
+                            serial_port.flush()
+                            current_word = ""
+                        
+                        # Send the space/whitespace
+                        space_byte = char.upper().encode('ascii', errors='ignore')
+                        debug_serial_out(space_byte)
+                        serial_port.write(space_byte)
+                        serial_port.flush()
+                        
+                        # Small delay between words for C64 processing
+                        time.sleep(0.1)
+                    else:
+                        current_word += char
+        
+        # Send any remaining word
+        if current_word:
+            word_bytes = current_word.upper().encode('ascii', errors='ignore')
+            debug_serial_out(word_bytes)
+            serial_port.write(word_bytes)
+            serial_port.flush()
+        
+        return full_response.strip().upper()
         
     except openai.error.AuthenticationError:
-        return "Error: Invalid API key. Please check your OpenAI configuration."
+        error_msg = "Error: Invalid API key. Please check your OpenAI configuration."
+        serial_port.write(error_msg.encode('ascii', errors='ignore'))
+        return error_msg
     except openai.error.RateLimitError:
-        return "Error: Rate limit exceeded. Please try again later."
+        error_msg = "Error: Rate limit exceeded. Please try again later."
+        serial_port.write(error_msg.encode('ascii', errors='ignore'))
+        return error_msg
     except openai.error.APIError as e:
-        return f"Error: API error - {str(e)}"
+        error_msg = f"Error: API error - {str(e)}"
+        serial_port.write(error_msg.encode('ascii', errors='ignore'))
+        return error_msg
     except Exception as e:
-        return f"Error: {str(e)}"
-
-def get_llm_response(message):
-    """
-    Legacy function for backward compatibility.
-    """
-    system_prompt = "You are a helpful assistant. Keep responses concise and under 200 characters when possible."
-    return get_llm_response_with_history([
-        {"role": "system", "content": system_prompt},
-        {"role": "user", "content": message}
-    ])
+        error_msg = f"Error: {str(e)}"
+        serial_port.write(error_msg.encode('ascii', errors='ignore'))
+        return error_msg
 
 if __name__ == "__main__":
     sys.exit(main() or 0)

@@ -100,6 +100,21 @@ cp .env.example .env
 
 ```bash
 chmod +x c64_llm_bridge.py
+chmod +x run_c64_chat.sh
+```
+
+### Activate Virtual Environment
+
+Before running the scripts, activate the virtual environment:
+
+```bash
+source venv/bin/activate
+```
+
+Alternatively, install the requirements globally (not recommended):
+
+```bash
+pip install -r requirements.txt
 ```
 
 ### Usage
@@ -159,10 +174,18 @@ View all available options:
 
 ## Building the C64 Application
 
-Compile the C64 program:
+Convert the BASIC program to PRG format:
 
 ```bash
-cl65 -t c64 -o chat.prg main.c serial.c display.c input.c
+petcat -w2 -o chatbas.prg -- chat.bas
+```
+
+### Creating a Disk Image (Optional)
+
+For real hardware or disk-based emulation:
+
+```bash
+c1541 -format "chat disk",cd d64 chat.d64 -attach chat.d64 -write chatbas.prg chat
 ```
 
 ## Testing Setup
@@ -177,40 +200,59 @@ cl65 -t c64 -o chat.prg main.c serial.c display.c input.c
 
 ### With VICE Emulator
 
+#### Manual Setup
+
 1. Start the virtual serial ports:
    ```bash
-   socat -d -d pty,raw,echo=0 pty,raw,echo=0
+   socat -d -d pty,raw,echo=0,clocal=1 pty,raw,echo=0,clocal=1
    ```
    Note the two device paths (e.g., `/dev/pts/3` and `/dev/pts/4`)
 
-2. Start VICE with serial configuration:
-   ```bash
-   x64sc -rsuser1 /dev/pts/3 -rsuserbaud 1200 chat.bas
-   ```
-   
-   Or manually:
-   ```bash
-   x64sc
-   ```
-   Then configure serial emulation in VICE:
-   - Go to Settings → I/O Settings → RS232
-   - Enable RS232 emulation  
-   - Set device to one of the virtual ports (e.g., `/dev/pts/3`)
-   - Set baud rate to 1200
-   - Paste the .bas code to emulated C64 Basic prompt
-   - Write `RUN` to code to emulated C64 Basic prompt
-
-3. Run the Python bridge script with the other virtual port:
+2. Run the Python bridge script with one virtual port:
    ```bash
    ./c64_llm_bridge.py /dev/pts/4
    ```
    
    Or with custom options:
    ```bash
-   ./c64_llm_bridge.py /dev/pts/4 --system-prompt c64_prompt.txt --timeout 5
+   ./c64_llm_bridge.py /dev/pts/4 --system-prompt prompts/system_prompt.txt --timeout 5
+   ```
+
+3. Start VICE with the other virtual port (in another terminal):
+   ```bash
+   x64sc -rsuser -rsdev1 /dev/pts/3 -rsuserbaud 1200 -autostartprgmode 1 chatbas.prg
    ```
 
 4. Test the connection
+
+## Automated Setup (Recommended)
+
+For convenience, use the provided launcher script that handles everything automatically.
+
+**Important:** Activate the virtual environment first:
+
+```bash
+source venv/bin/activate
+```
+
+Then run the launcher:
+
+```bash
+# Basic usage - sets up ports, starts bridge, launches VICE
+./run_c64_chat.sh
+
+# With custom system prompt
+./run_c64_chat.sh --prompt prompts/system_prompt.txt
+
+# Get help
+./run_c64_chat.sh --help
+```
+
+The launcher script:
+- Creates virtual serial ports with socat
+- Starts the Python bridge automatically
+- Launches VICE with the correct configuration
+- Handles cleanup when you exit
 
 ## Alternative LLM Services
 

@@ -47,12 +47,28 @@ This application transforms your C64 into a terminal for chatting with modern AI
 
 This version uses C64 BASIC - no compilation needed!
 
-### Creating a Disk Image
+### Converting BASIC to PRG Format
+
+To convert the BASIC text file to a C64 program file:
+
+```bash
+petcat -w2 -o chatbas.prg -- chat.bas
+```
+
+### For Emulation (Recommended)
+
+The PRG format is convenient for emulation as it can be run directly:
+
+```bash
+x64sc -autostartprgmode 1 chatbas.prg
+```
+
+### For Real Hardware or Disk-based Emulation
 
 To create a .d64 disk image with the BASIC program:
 
 ```bash
-c1541 -format "chat disk",cd d64 chat.d64 -attach chat.d64 -write chat.bas chat
+c1541 -format "chat disk",cd d64 chat.d64 -attach chat.d64 -write chatbas.prg chat
 ```
 
 ## Usage
